@@ -1,0 +1,2 @@
+class ItemAlias < ApplicationRecord
+end
