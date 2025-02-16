@@ -53,3 +53,8 @@ terraform.tfstate*
 /node_modules/
 yarn-error.log
 npm-debug.log
+# Ignore application configuration
+
+
+# Ignore application configuration
+/config/application.yml
