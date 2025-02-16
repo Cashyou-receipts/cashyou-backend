@@ -19,6 +19,23 @@ class AwsS3Service
     CLIENT.list_objects_v2(bucket: bucket).contents
   end
 
+
+  def upload_receipt!(filename:, object_key:, message_id: nil, from:)
+    File.open(filename, "rb") do |file|
+      CLIENT.put_object({
+        body: file,
+        bucket: ENV["S3_BUCKET_NAME"],
+        key: object_key,
+        metadata: {
+          "updload_date"=>Date.today.to_s,
+          "from"=>from,
+          "message_id"=>message_id
+        },
+        content_type: "image/jpg"
+      })
+    end
+  end
+
   def delete_receipt(keys:)
     keys = Array(keys)
     resp = CLIENT.delete_objects({
