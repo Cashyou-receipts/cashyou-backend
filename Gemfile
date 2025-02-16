@@ -37,6 +37,8 @@ gem "bootsnap", require: false
 # gem "rack-cors"
 
 gem 'faraday'
+gem 'figaro', github: 'laserlemon/figaro'
+gem 'aws-sdk-s3'
 
 group :development, :test do
   gem 'rspec-rails', '~> 7.0.0'
