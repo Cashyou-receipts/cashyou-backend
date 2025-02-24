@@ -1,9 +1,9 @@
 require 'json'
 
 class ReceiptDissector
-  ERROR_MARGIN = 1.8
+  ERROR_MARGIN = 1.48
   HORIZONTAL_MARGIN_MULTIPLIER = 1.5
-  CATEGORIES = { "balance"=>/(balance|total)(\W|$|\s)/, "deduction"=>/^(?=.*-)\$?(\d{1,3}(?:,\d{3})*\.\d{2})$/, "price"=>/^(?!.*[\-@\/])\$?(\d{1,3}(?:,\d{3})*\.\d{2})$/, "item"=>/[a-zA-Z\/]+/, "price_disqualifier"=>/[\-\/@]/, "tax"=>/^(?:tax|taxes)(?:$|\b)/, "subtotal"=>/^(?:subtotal|total before|sub total)(?:$|\b)/ }
+  CATEGORIES = { "balance"=>/(balance|total)(\W|$|\s)/, "deduction"=>/^(?=.*-)\$?(\d{1,3}(?:,\d{3})*\.\d{2})$/, "price"=>/^(?!.*[\-@\/])\$?(\d{1,3}(?:,\d{3})*\.\d{2})$/, "item"=>/[a-zA-Z\/]+/, "price_disqualifier"=>/[\-\/@]/, "tax"=>/(?:^|\s)(?:tax|taxes)(?:[^a-zA-Z]|$)/, "subtotal"=>/^(?:subtotal|total before|sub total)(?:$|[^a-zA-Z])/ }
   attr_reader :balance, :items, :subtotal, :tax
 
   def initialize(vision_api_response)
@@ -42,6 +42,7 @@ class ReceiptDissector
 
     @balance = find_total(potential_balance_polys, potential_prices)
     lines = receipt_by_line
+    @first_section_text = @annotation_polys.select { |poly| poly}
     @items = find_items(lines)
 
     {"balance"=>balance, "items"=>items}
@@ -73,12 +74,13 @@ class ReceiptDissector
       blocks = order_by_direction(line[:items], :right)
       description_start_index = blocks.index(price) + 1
       words = blocks[description_start_index..].select { |block| block["description"].match? CATEGORIES["item"]}
+      words_string = words.map { |poly| poly["description"] }.reverse.join(" ")
 
-      if words.any? { |word|  word["description"].downcase.match?(CATEGORIES["subtotal"]) }
-        @subtotal = price["description"]
+      if words_string.downcase.match?(CATEGORIES["subtotal"]) 
+        @subtotal = price["description"].to_f.round(2)
         next
-      elsif words.any? { |word|  word["description"].downcase.match?(CATEGORIES["tax"]) }
-        @tax = price["description"]
+      elsif words_string.downcase.match?(CATEGORIES["tax"])
+        @tax = price["description"].to_f.round(2)
         next
       end
 
@@ -102,10 +104,9 @@ class ReceiptDissector
       price = potential_prices.detect { |balance| fits_on_slope?(balance, poly) }
       lines[poly] = price["description"].match(CATEGORIES["price"])[1] if price
     end
-
     line = lines.max_by { |poly, number| number.to_f }
     @balance_poly = line.first
-    return line.last
+    return line.last.to_f.round(2)
   end
 
   def categorize_poly(text)
@@ -158,7 +159,6 @@ class ReceiptDissector
     x1 = first_poly_bottom_left["x"].to_f
     x2 = first_poly_bottom_right["x"].to_f
     x3 = second_poly_bottom_left["x"].to_f
-    
     slope = (y2-y1) / (x2-x1)
     expected_y_value = y1 + slope * (x3 - x1)
     actual_error = (expected_y_value - y3).abs
